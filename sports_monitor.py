@@ -120,7 +120,7 @@ def aliyun_web_search(query: str, enable_search: bool = True, timeout: int = 10,
 
 def parse_football_fixtures(search_result: str, date: str) -> dict:
     """
-    解析阿里云返回的足球赛程文本为结构化数据
+    解析阿里云返回的足球赛程文本为结构化数据 (v3.0.4 优化版)
     
     Args:
         search_result: 阿里云返回的文本
@@ -142,9 +142,11 @@ def parse_football_fixtures(search_result: str, date: str) -> dict:
         'ligue_1': []
     }
     
-    # 使用正则表达式提取比赛信息
-    # 匹配模式：时间 + 主队 + vs/VS + 客队 + (可选备注)
-    pattern = r'(\d{1,2}:\d{2})\s*[:：]?\s*([^\s]+(?:队 | 联 | 城 | 联)?)\s*(?:vs|VS|vs\.|对阵)\s*([^\s]+(?:队 | 联 | 城 | 联)?)'
+    # v3.0.4 优化：更宽松的正则表达式，支持中英文队名
+    # 匹配模式 1：时间 + 主队 + vs/VS + 客队
+    pattern1 = r'(\d{1,2}:\d{2})\s*[:：]?\s*([^vsVS]+?)\s*(?:vs|VS|vs\.|对阵)\s*(.+?)(?:\s*$|\s+[（\(]|\s+\|)'
+    # 匹配模式 2：时间 + 主队 @ 客队（NBA 风格）
+    pattern2 = r'(\d{1,2}:\d{2})\s*[:：]?\s*(.+?)\s*@\s*(.+?)(?:\s*$|\s+[（\(]|\s+\|)'
     
     lines = search_result.split('\n')
     current_league = None
@@ -152,68 +154,93 @@ def parse_football_fixtures(search_result: str, date: str) -> dict:
     for line in lines:
         line = line.strip()
         
-        # 检测联赛名称
-        if '中超' in line or 'CSL' in line:
-            current_league = 'csl'
-        elif '英超' in line:
-            current_league = 'premier_league'
-        elif '西甲' in line:
-            current_league = 'la_liga'
-        elif '意甲' in line:
-            current_league = 'serie_a'
-        elif '德甲' in line:
-            current_league = 'bundesliga'
-        elif '法甲' in line:
-            current_league = 'ligue_1'
-        elif '拜仁' in line or '多特' in line:
-            current_league = 'bundesliga'
-        elif '皇马' in line or '巴萨' in line or '巴塞罗那' in line:
-            current_league = 'la_liga'
+        # 跳过无效行
+        if len(line) < 10 or '根据' in line or '知识库' in line:
+            continue
         
-        # 匹配比赛
-        match = re.search(pattern, line)
+        # 检测联赛名称（优先级从高到低）
+        if '中超' in line or 'CSL' in line or '中国超级联赛' in line:
+            current_league = 'csl'
+        elif '英超' in line or 'Premier League' in line:
+            current_league = 'premier_league'
+        elif '西甲' in line or 'La Liga' in line:
+            current_league = 'la_liga'
+        elif '意甲' in line or 'Serie A' in line:
+            current_league = 'serie_a'
+        elif '德甲' in line or 'Bundesliga' in line:
+            current_league = 'bundesliga'
+        elif '法甲' in line or 'Ligue 1' in line:
+            current_league = 'ligue_1'
+        # 通过球队名推断联赛
+        elif any(t in line for t in ['拜仁', '多特', '莱比锡', 'Bayern', 'Dortmund']):
+            current_league = 'bundesliga'
+        elif any(t in line for t in ['皇马', '巴萨', '马竞', 'Real Madrid', 'Barcelona', 'Atletico']):
+            current_league = 'la_liga'
+        elif any(t in line for t in ['尤文', 'AC 米兰', '国米', 'Juventus', 'Milan', 'Inter']):
+            current_league = 'serie_a'
+        elif any(t in line for t in ['曼城', '利物浦', '阿森纳', 'Man City', 'Liverpool', 'Arsenal']):
+            current_league = 'premier_league'
+        
+        # 匹配比赛（尝试两种模式）
+        match = re.search(pattern1, line)
+        if not match:
+            match = re.search(pattern2, line)
+        
         if match and current_league:
-            time = match.group(1)
+            time = match.group(1).strip()
             home = match.group(2).strip()
             away = match.group(3).strip()
             
-            # 清理队名
+            # v3.0.4 优化：更智能的队名清理
+            # 移除括号内容
             home = re.sub(r'[（\(].*?[）\)]', '', home).strip()
             away = re.sub(r'[（\(].*?[）\)]', '', away).strip()
+            # 移除常见后缀
+            home = re.sub(r'\s*(FC|Club|United|City|Real|Sports)\s*$', '', home, flags=re.IGNORECASE).strip()
+            away = re.sub(r'\s*(FC|Club|United|City|Real|Sports)\s*$', '', away, flags=re.IGNORECASE).strip()
             
-            # 检测备注信息
+            # v3.0.4 优化：检测更多备注信息
             note = ''
             if '升班马' in line:
                 note = '升班马'
-            elif '大胜' in line or '4-1' in line or '3-0' in line:
-                note = '大胜'
+            elif '德比' in line or 'derby' in line.lower():
+                note = '德比大战'
+            elif '榜首' in line or '榜首大战' in line:
+                note = '榜首大战'
+            elif '保级' in line:
+                note = '保级关键战'
+            elif '大胜' in line or re.search(r'\d+-\d+', line):
+                note = ''  # 有比分时不添加备注
             elif '冷门' in line:
                 note = '冷门'
             
             # 检测比分
-            score_match = re.search(r'(\d+-\d+|\d+-\d+)', line)
+            score_match = re.search(r'(\d+-\d+)', line)
             score = score_match.group(1) if score_match else ''
             status = 'FT' if score else ''
             
-            fixtures[current_league].append({
-                'time': time,
-                'home': home,
-                'away': away,
-                'note': note,
-                'score': score,
-                'status': status,
-                'priority': 'high' if note else 'medium'
-            })
+            # v3.0.4 优化：验证队名有效性（至少 2 个字符）
+            if len(home) >= 2 and len(away) >= 2:
+                fixtures[current_league].append({
+                    'time': time,
+                    'home': home,
+                    'away': away,
+                    'note': note,
+                    'score': score,
+                    'status': status,
+                    'priority': 'high' if note else 'medium'
+                })
     
     return fixtures
 
 
 def fetch_football_fixtures_auto(date: str) -> dict:
     """
-    自动获取足球赛程（阿里云搜索 + 解析）
+    自动获取足球赛程（阿里云搜索 + 解析）v3.0.4 优化版
     """
-    query = f"{date} 足球赛程 中超 英超 西甲 意甲 德甲 法甲 比赛时间 对阵"
-    search_result = aliyun_web_search(query, enable_search=True)
+    # v3.0.4 优化：更精准的搜索词，添加具体日期、直播、对阵等关键词
+    query = f"{date} 足球赛程表 直播时间表 中超 CSL 英超 西甲 意甲 德甲 法甲 比赛时间 对阵 主场 vs 客场"
+    search_result = aliyun_web_search(query, enable_search=True, timeout=15)
     
     if not search_result:
         return {}
@@ -250,20 +277,20 @@ def fetch_all_sports_schedule_auto(date: str, show_progress: bool = True) -> dic
     total_batches = 4
     current_batch = 0
     
-    # ========== 第 1 批：篮球（10 秒超时）==========
+    # ========== 第 1 批：篮球（10 秒超时）v3.0.4 优化 ==========
     current_batch += 1
     if show_progress:
         print(f"⏳ 搜索进度 [{current_batch}/{total_batches}] 篮球 (NBA + CBA)...")
         show_loading_animation("   正在搜索", duration=0.3, dots=3)
     
-    # T4 优化：添加"今天"、"直播"等关键词提高准确性
-    query1 = f"{date} NBA 赛程 今天 比赛时间 CBA 全明星 直播"
+    # v3.0.4 优化：添加"赛程表"、"时间"等关键词
+    query1 = f"{date} NBA 赛程表 今天 比赛时间 CBA 赛程 直播时间表 vs 对阵"
     search1 = aliyun_web_search(query1, enable_search=True, timeout=10, show_progress=False)
     
     if search1:
         for line in search1.split('\n'):
             line = line.strip()
-            if len(line) < 10 or '根据' in line:
+            if len(line) < 10 or '根据' in line or '知识库' in line:
                 continue
             
             # CBA 全明星
@@ -273,26 +300,26 @@ def fetch_all_sports_schedule_auto(date: str, show_progress: bool = True) -> dic
                 result['basketball']['cba_allstar'].append({
                     'time': time,
                     'event': 'CBA 全明星',
-                    'description': line[:60]
+                    'description': line[:80]
                 })
     
     if show_progress:
         print(f"✅ 批次 {current_batch} 完成")
     
-    # ========== 第 2 批：电竞（10 秒超时）==========
+    # ========== 第 2 批：电竞（10 秒超时）v3.0.4 优化 ==========
     current_batch += 1
     if show_progress:
         print(f"⏳ 搜索进度 [{current_batch}/{total_batches}] 电竞 (LPL + LCK)...")
         show_loading_animation("   正在搜索", duration=0.3, dots=3)
     
-    # T4 优化：添加具体战队名和"春季赛"等关键词
-    query2 = f"{date} LPL 春季赛 LCK 赛程 今天 WBG EDG BLG JDG GEN T1"
+    # v3.0.4 优化：添加"赛程表"、"比赛时间"、"vs"等关键词
+    query2 = f"{date} LPL 春季赛赛程表 LCK 赛程表 今天 比赛时间 WBG EDG BLG JDG GEN T1 vs 对阵"
     search2 = aliyun_web_search(query2, enable_search=True, timeout=10, show_progress=False)
     
     if search2:
         for line in search2.split('\n'):
             line = line.strip()
-            if len(line) < 10 or '根据' in line:
+            if len(line) < 10 or '根据' in line or '知识库' in line:
                 continue
             
             # LPL
@@ -301,7 +328,7 @@ def fetch_all_sports_schedule_auto(date: str, show_progress: bool = True) -> dic
                 time = time_match.group(1) if time_match else 'TBD'
                 result['esports']['lpl'].append({
                     'time': time,
-                    'description': line[:60]
+                    'description': line[:80]
                 })
             
             # LCK
@@ -310,7 +337,7 @@ def fetch_all_sports_schedule_auto(date: str, show_progress: bool = True) -> dic
                 time = time_match.group(1) if time_match else 'TBD'
                 result['esports']['lck'].append({
                     'time': time,
-                    'description': line[:60]
+                    'description': line[:80]
                 })
     
     if show_progress:
@@ -353,14 +380,14 @@ def fetch_all_sports_schedule_auto(date: str, show_progress: bool = True) -> dic
     if show_progress:
         print(f"✅ 批次 {current_batch} 完成")
     
-    # ========== 第 4 批：足球（15 秒超时）==========
+    # ========== 第 4 批：足球（15 秒超时）v3.0.4 优化 ==========
     current_batch += 1
     if show_progress:
         print(f"⏳ 搜索进度 [{current_batch}/{total_batches}] 足球 (中超 + 五大联赛)...")
         show_loading_animation("   正在搜索", duration=0.4, dots=4)
     
-    # T4 优化：添加"直播"、"对阵"等关键词，并指定具体球队
-    query4 = f"{date} 足球赛程 中超 英超 西甲 意甲 德甲 法甲 直播 对阵 比赛时间"
+    # v3.0.4 优化：更精准的搜索词
+    query4 = f"{date} 足球赛程表 直播时间表 中超 CSL 英超 西甲 意甲 德甲 法甲 比赛时间 对阵 主场 vs"
     search4 = aliyun_web_search(query4, enable_search=True, timeout=15, show_progress=False)
     
     if search4:
