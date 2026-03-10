@@ -1,0 +1,46 @@
+{
+  "version": "1.1.0",
+  "updated_at": "2026-03-07",
+  "sports": {
+    "nba": {
+      "enabled": true,
+      "teams": ["Golden State Warriors", "Los Angeles Lakers", "Boston Celtics"],
+      "priority": "high"
+    },
+    "cba": {
+      "enabled": true,
+      "teams": ["广东宏远", "辽宁本钢", "北京首钢", "浙江广厦"],
+      "priority": "high"
+    },
+    "soccer_europe": {
+      "enabled": true,
+      "leagues": ["premier_league", "la_liga", "serie_a", "bundesliga", "ligue_1"],
+      "teams": ["Real Madrid", "Barcelona", "Manchester City", "Liverpool", "Bayern Munich"],
+      "priority": "high"
+    },
+    "soccer_china": {
+      "enabled": true,
+      "leagues": ["csl"],
+      "teams": [],
+      "priority": "medium"
+    },
+    "f1": {
+      "enabled": true,
+      "teams": ["Red Bull Racing", "Mercedes", "Ferrari", "McLaren"],
+      "priority": "medium"
+    },
+    "olympics": {
+      "enabled": true,
+      "types": ["summer", "winter"],
+      "sports": ["basketball", "football", "swimming", "athletics", "diving", "table-tennis"],
+      "priority": "high",
+      "china_focus": true
+    }
+  },
+  "notifications": {
+    "enabled": true,
+    "channel": "discord",
+    "remind_before_minutes": 60,
+    "only_high_priority": false
+  }
+}

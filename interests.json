@@ -1,0 +1,163 @@
+{
+  "version": "3.0.1",
+  "updated_at": "2026-03-07",
+  "sports": {
+    "basketball": {
+      "name": "篮球",
+      "priority": 1,
+      "enabled": true,
+      "leagues": {
+        "nba": {
+          "name": "NBA",
+          "priority": 1,
+          "enabled": true,
+          "teams": ["Golden State Warriors", "Los Angeles Lakers", "Boston Celtics"]
+        },
+        "cba": {
+          "name": "CBA",
+          "priority": 2,
+          "enabled": true,
+          "teams": ["广东宏远", "辽宁本钢", "北京首钢"],
+          "special_events": ["全明星周末"]
+        },
+        "fiba": {
+          "name": "国际篮联赛事",
+          "priority": 3,
+          "enabled": true,
+          "teams": ["中国男篮", "中国女篮"],
+          "tournaments": ["奥运会", "世界杯", "亚洲杯", "奥运预选赛"]
+        }
+      }
+    },
+    "football": {
+      "name": "足球",
+      "priority": 2,
+      "enabled": true,
+      "leagues": {
+        "europe_top5": {
+          "name": "欧洲五大联赛",
+          "priority": 1,
+          "enabled": true,
+          "leagues": ["premier_league", "la_liga", "serie_a", "bundesliga", "ligue_1"],
+          "teams": ["Real Madrid", "Barcelona", "Manchester City", "Liverpool"]
+        },
+        "csl": {
+          "name": "中超联赛",
+          "priority": 2,
+          "enabled": true,
+          "teams": []
+        },
+        "fifa": {
+          "name": "国际足联赛事",
+          "priority": 3,
+          "enabled": true,
+          "tournaments": ["世界杯", "亚洲杯", "欧洲杯", "世预赛"]
+        }
+      }
+    },
+    "badminton": {
+      "name": "羽毛球",
+      "priority": 3,
+      "enabled": true,
+      "tournaments": {
+        "all_england": {
+          "name": "全英公开赛",
+          "priority": 1,
+          "enabled": true,
+          "players": ["陈雨菲", "安洗莹", "王祉怡", "山口茜", "刘圣书", "谭宁", "贾一凡", "郭新娃", "陈芳卉"]
+        }
+      }
+    },
+    "tennis": {
+      "name": "网球",
+      "priority": 4,
+      "enabled": true,
+      "tournaments": {
+        "indian_wells": {
+          "name": "印第安维尔斯公开赛",
+          "priority": 1,
+          "enabled": true,
+          "players": ["王欣瑜", "萨巴伦卡", "大坂直美", "辛纳", "兹维列夫"]
+        }
+      }
+    },
+    "esports": {
+      "name": "电竞",
+      "priority": 5,
+      "enabled": true,
+      "leagues": {
+        "lpl": {
+          "name": "LPL 春季赛",
+          "priority": 1,
+          "enabled": true,
+          "teams": ["WBG", "EDG", "BLG", "JDG"]
+        },
+        "lck": {
+          "name": "LCK 春季赛",
+          "priority": 2,
+          "enabled": true,
+          "teams": ["GEN", "T1"]
+        }
+      }
+    },
+    "golf": {
+      "name": "高尔夫",
+      "priority": 6,
+      "enabled": true,
+      "tournaments": {
+        "lpga_blue_bay": {
+          "name": "LPGA 蓝湾大师赛",
+          "priority": 1,
+          "enabled": true,
+          "players": ["林希妤", "殷若宁"]
+        }
+      }
+    },
+    "ice_hockey": {
+      "name": "冰球",
+      "priority": 7,
+      "enabled": true,
+      "leagues": {
+        "khl": {
+          "name": "KHL",
+          "priority": 1,
+          "enabled": true,
+          "teams": ["上海龙"]
+        },
+        "nhl": {
+          "name": "NHL",
+          "priority": 2,
+          "enabled": true
+        }
+      }
+    },
+    "motorsport": {
+      "name": "赛车",
+      "priority": 8,
+      "enabled": true,
+      "leagues": {
+        "f1": {
+          "name": "F1 一级方程式",
+          "priority": 1,
+          "enabled": true,
+          "teams": ["Red Bull Racing", "Mercedes", "Ferrari", "McLaren"]
+        }
+      }
+    },
+    "olympics": {
+      "name": "奥运会",
+      "priority": 9,
+      "enabled": true,
+      "show_within_days": 30,
+      "types": ["summer", "winter"],
+      "china_focus": true
+    }
+  },
+  "display_rules": {
+    "only_today": true,
+    "max_future_days": 30,
+    "hide_completed": true,
+    "sort_by_priority": true,
+    "show_all_sports": true
+  }
+}

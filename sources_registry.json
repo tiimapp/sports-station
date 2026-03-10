@@ -1,0 +1,79 @@
+{
+  "f1": {
+    "name": "Formula 1",
+    "primary_url": "https://www.formula1.com/en/latest/article/formula-1-reveals-calendar-for-2026-season.YctbMZWqBvrgyddrnauo8",
+    "backup_urls": ["https://www.fia.com"],
+    "chinese_urls": [
+      "https://sports.sina.com.cn/f1",
+      "https://sports.qq.com/f1"
+    ],
+    "refresh_interval_hours": 24,
+    "data_type": "schedule"
+  },
+  "nba": {
+    "name": "NBA",
+    "primary_url": "https://www.nba.com/schedule",
+    "backup_urls": ["https://www.espn.com/nba"],
+    "chinese_urls": [
+      "https://sports.sina.com.cn/nba",
+      "https://sports.qq.com/nba"
+    ],
+    "refresh_interval_hours": 1,
+    "data_type": "live_scores"
+  },
+  "cba": {
+    "name": "CBA (Chinese Basketball Association)",
+    "primary_url": "http://www.cba.gov.cn",
+    "backup_urls": ["https://www.hupu.com/cba"],
+    "chinese_urls": [
+      "https://sports.sina.com.cn/cba",
+      "https://sports.qq.com/cba"
+    ],
+    "refresh_interval_hours": 1,
+    "data_type": "live_scores"
+  },
+  "premier_league": {
+    "name": "Premier League",
+    "primary_url": "https://www.premierleague.com",
+    "backup_urls": ["https://www.espn.com/soccer/league/_/league/ENG.1"],
+    "chinese_urls": [
+      "https://sports.sina.com.cn/premierleague",
+      "https://sports.qq.com/premierleague"
+    ],
+    "refresh_interval_hours": 6,
+    "data_type": "live_scores"
+  },
+  "la_liga": {
+    "name": "La Liga",
+    "primary_url": "https://www.laliga.com",
+    "backup_urls": ["https://www.espn.com/soccer/league/_/league/ESP.1"],
+    "chinese_urls": [
+      "https://sports.sina.com.cn/laliga",
+      "https://sports.qq.com/laliga"
+    ],
+    "refresh_interval_hours": 6,
+    "data_type": "live_scores"
+  },
+  "serie_a": {
+    "name": "Serie A",
+    "primary_url": "https://www.legaseriea.it",
+    "backup_urls": ["https://www.espn.com/soccer/league/_/league/ITA.1"],
+    "chinese_urls": [
+      "https://sports.sina.com.cn/seriea",
+      "https://sports.qq.com/seriea"
+    ],
+    "refresh_interval_hours": 6,
+    "data_type": "live_scores"
+  },
+  "bundesliga": {
+    "name": "Bundesliga",
+    "primary_url": "https://www.bundesliga.com",
+    "backup_urls": ["https://www.espn.com/soccer/league/_/league/GER.1"],
+    "chinese_urls": [
+      "https://sports.sina.com.cn/bundesliga",
+      "https://sports.qq.com/bundesliga"
+    ],
+    "refresh_interval_hours": 6,
+    "data_type": "live_scores"
+  }
+}
