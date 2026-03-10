@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Sports Monitor - 体育赛事监控技能 v3.0.0
-全自动实时赛程获取，基于阿里云 WebSearch
+Sports Monitor - 体育赛事监控技能 v3.0.5
+全自动实时赛程获取，基于阿里云 WebSearch + MCP Exa
 
 支持：NBA, CBA, 中超，欧洲五大联赛，F1, 奥运会
-数据源：阿里云 Dashscope WebSearch + NBA.com CDN
+数据源：阿里云 Dashscope WebSearch + NBA.com CDN + MCP Exa
 """
 
 import argparse
@@ -13,6 +13,7 @@ import json
 import os
 import re
 import sys
+import subprocess
 from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Tuple
 import requests
@@ -63,24 +64,86 @@ ALIYUN_CONFIG = {
 }
 
 # ============================================================================
-# 阿里云 WebSearch 实时搜索
+# MCP Exa 搜索（v3.0.5 新增）
 # ============================================================================
 
-def aliyun_web_search(query: str, enable_search: bool = True, timeout: int = 10, show_progress: bool = False) -> str:
+def mcp_web_search(query: str, timeout: int = 15, show_progress: bool = False) -> str:
     """
-    使用阿里云 Dashscope WebSearch 获取实时信息 (v3.0.3 优化版)
+    使用 MCP Exa 进行网络搜索（v3.0.5 新增）
     
     Args:
         query: 搜索查询
-        enable_search: 启用搜索插件
-        timeout: 超时时间（秒），默认 10 秒 (v3.0.3 从 20s 优化到 10s)
+        timeout: 超时时间（秒）
         show_progress: 显示进度提示
     
     Returns:
         搜索结果文本，失败返回空字符串
     """
     if show_progress:
-        print(f"⏳ 搜索中：{query[:40]}...")
+        print(f"🔍 MCP 搜索：{query[:40]}...")
+    
+    try:
+        # 使用 mcporter CLI 调用 MCP 工具
+        result = subprocess.run(
+            ['mcporter', 'call', 'exa.web_search_exa', f'query={query}'],
+            capture_output=True,
+            text=True,
+            timeout=timeout
+        )
+        
+        if result.returncode == 0:
+            if show_progress:
+                print(f"✅ MCP 搜索完成")
+            # 解析 MCP 返回的 JSON
+            try:
+                mcp_result = json.loads(result.stdout)
+                # 提取搜索结果
+                if 'results' in mcp_result:
+                    # 将搜索结果转换为文本
+                    texts = []
+                    for item in mcp_result['results'][:5]:  # 取前 5 个结果
+                        title = item.get('title', '')
+                        text = item.get('text', '')
+                        url = item.get('url', '')
+                        texts.append(f"{title}\n{text}\n来源：{url}")
+                    return '\n\n'.join(texts)
+                return result.stdout
+            except json.JSONDecodeError:
+                return result.stdout
+        else:
+            if show_progress:
+                print(f"⚠️  MCP 搜索失败：{result.stderr}")
+            return ""
+    except subprocess.TimeoutExpired:
+        if show_progress:
+            print(f"⚠️  MCP 搜索超时 ({timeout}秒)")
+        return ""
+    except Exception as e:
+        if show_progress:
+            print(f"⚠️  MCP 搜索异常：{e}")
+        return ""
+
+
+# ============================================================================
+# 阿里云 WebSearch 实时搜索
+# ============================================================================
+
+def aliyun_web_search(query: str, enable_search: bool = True, timeout: int = 10, show_progress: bool = False, use_mcp_fallback: bool = True) -> str:
+    """
+    使用阿里云 Dashscope WebSearch 获取实时信息 (v3.0.5 增加 MCP 备用)
+    
+    Args:
+        query: 搜索查询
+        enable_search: 启用搜索插件
+        timeout: 超时时间（秒），默认 10 秒 (v3.0.3 从 20s 优化到 10s)
+        show_progress: 显示进度提示
+        use_mcp_fallback: 失败时使用 MCP 备用搜索
+    
+    Returns:
+        搜索结果文本，失败返回空字符串
+    """
+    if show_progress:
+        print(f"⏳ 阿里云搜索：{query[:40]}...")
     
     headers = {
         "Authorization": f"Bearer {ALIYUN_CONFIG['api_key']}",
@@ -104,17 +167,33 @@ def aliyun_web_search(query: str, enable_search: bool = True, timeout: int = 10,
         result = response.json()
         
         if result.get('choices'):
+            content = result['choices'][0]['message']['content']
             if show_progress:
-                print(f"✅ 搜索完成")
-            return result['choices'][0]['message']['content']
+                print(f"✅ 阿里云搜索完成")
+            return content
+        # v3.0.5: 阿里云无结果时尝试 MCP
+        if use_mcp_fallback:
+            if show_progress:
+                print(f"⚠️  阿里云无结果，切换 MCP 搜索...")
+            return mcp_web_search(query, timeout=timeout, show_progress=show_progress)
         return ""
     except requests.exceptions.Timeout:
         if show_progress:
-            print(f"⚠️  搜索超时 ({timeout}秒)")
+            print(f"⚠️  阿里云超时 ({timeout}秒)")
+        # v3.0.5: 超时时尝试 MCP
+        if use_mcp_fallback:
+            if show_progress:
+                print(f"🔄 切换 MCP 搜索...")
+            return mcp_web_search(query, timeout=timeout, show_progress=show_progress)
         return ""
     except Exception as e:
         if show_progress:
-            print(f"⚠️  搜索失败：{e}")
+            print(f"⚠️  阿里云失败：{e}")
+        # v3.0.5: 异常时尝试 MCP
+        if use_mcp_fallback:
+            if show_progress:
+                print(f"🔄 切换 MCP 搜索...")
+            return mcp_web_search(query, timeout=timeout, show_progress=show_progress)
         return ""
 
 
@@ -236,11 +315,17 @@ def parse_football_fixtures(search_result: str, date: str) -> dict:
 
 def fetch_football_fixtures_auto(date: str) -> dict:
     """
-    自动获取足球赛程（阿里云搜索 + 解析）v3.0.4 优化版
+    自动获取足球赛程（阿里云 + MCP 搜索）v3.0.5 优化版
     """
-    # v3.0.4 优化：更精准的搜索词，添加具体日期、直播、对阵等关键词
-    query = f"{date} 足球赛程表 直播时间表 中超 CSL 英超 西甲 意甲 德甲 法甲 比赛时间 对阵 主场 vs 客场"
-    search_result = aliyun_web_search(query, enable_search=True, timeout=15)
+    # v3.0.5 优化：使用阿里云 + MCP 双源搜索
+    # 阿里云搜索
+    query_aliyun = f"{date} 足球赛程表 直播时间表 中超 CSL 英超 西甲 意甲 德甲 法甲 比赛时间 对阵 主场 vs 客场"
+    search_result = aliyun_web_search(query_aliyun, enable_search=True, timeout=15, use_mcp_fallback=True)
+    
+    # v3.0.5: 如果阿里云无结果，单独使用 MCP 搜索
+    if not search_result:
+        query_mcp = f"{date} football schedule {date} soccer matches Premier League La Liga Serie A Bundesliga"
+        search_result = mcp_web_search(query_mcp, timeout=15, show_progress=True)
     
     if not search_result:
         return {}
@@ -380,15 +465,22 @@ def fetch_all_sports_schedule_auto(date: str, show_progress: bool = True) -> dic
     if show_progress:
         print(f"✅ 批次 {current_batch} 完成")
     
-    # ========== 第 4 批：足球（15 秒超时）v3.0.4 优化 ==========
+    # ========== 第 4 批：足球（15 秒超时）v3.0.5 MCP 增强 ==========
     current_batch += 1
     if show_progress:
         print(f"⏳ 搜索进度 [{current_batch}/{total_batches}] 足球 (中超 + 五大联赛)...")
         show_loading_animation("   正在搜索", duration=0.4, dots=4)
     
-    # v3.0.4 优化：更精准的搜索词
+    # v3.0.5 优化：阿里云 + MCP 双源搜索
     query4 = f"{date} 足球赛程表 直播时间表 中超 CSL 英超 西甲 意甲 德甲 法甲 比赛时间 对阵 主场 vs"
-    search4 = aliyun_web_search(query4, enable_search=True, timeout=15, show_progress=False)
+    search4 = aliyun_web_search(query4, enable_search=True, timeout=15, show_progress=False, use_mcp_fallback=True)
+    
+    # v3.0.5: 如果双源都无结果，尝试纯英文 MCP 搜索
+    if not search4:
+        if show_progress:
+            print(f"🔄 尝试 MCP 英文搜索...")
+        query4_mcp = f"{date} football schedule Premier League La Liga Serie A Bundesliga matches today"
+        search4 = mcp_web_search(query4_mcp, timeout=15, show_progress=False)
     
     if search4:
         result['football'] = parse_football_fixtures(search4, date)
