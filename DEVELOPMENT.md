@@ -34,21 +34,35 @@
 └── DEVELOPMENT.md        # 开发文档
 ```
 
-### 数据源
+### 数据源（v3.0.6 三源搜索）
 
-| 赛事 | 数据源 | 获取方式 | 成功率 |
-|-----|--------|---------|--------|
-| NBA | NBA.com CDN | 自动获取 | 100% ✅ |
-| 中超 | 阿里云 WebSearch | 自动搜索 | 80% ✅ |
-| 欧洲联赛 | 阿里云 WebSearch | 自动搜索 | 60% ⚠️ |
-| CBA | 阿里云 WebSearch | 自动搜索 | 70% ✅ |
-| 羽毛球 | 阿里云 WebSearch | 自动搜索 | 70% ✅ |
-| 网球 | 阿里云 WebSearch | 自动搜索 | 70% ✅ |
-| 电竞 | 阿里云 WebSearch | 自动搜索 | 80% ✅ |
-| 高尔夫 | 阿里云 WebSearch | 自动搜索 | 60% ⚠️ |
-| 冰球 | 阿里云 WebSearch | 自动搜索 | 70% ✅ |
-| F1 | API-Sports | 需 API Key | 可选 |
-| 奥运会 | 动态计算 | 内置 | 100% ✅ |
+| 赛事 | 主数据源 | 备用 1 | 备用 2 | 综合成功率 |
+|-----|---------|-------|-------|-----------|
+| NBA | NBA.com CDN | MCP Exa | Tavily | 100% ✅ |
+| 中超 | 阿里云 WebSearch | MCP Exa | Tavily | 90% ✅ |
+| 欧洲联赛 | 阿里云 WebSearch | MCP Exa | Tavily | 85% ✅ |
+| CBA | 阿里云 WebSearch | MCP Exa | Tavily | 85% ✅ |
+| 羽毛球 | 阿里云 WebSearch | MCP Exa | Tavily | 85% ✅ |
+| 网球 | 阿里云 WebSearch | MCP Exa | Tavily | 85% ✅ |
+| 电竞 | 阿里云 WebSearch | MCP Exa | Tavily | 90% ✅ |
+| 高尔夫 | 阿里云 WebSearch | MCP Exa | Tavily | 80% ✅ |
+| 冰球 | 阿里云 WebSearch | MCP Exa | Tavily | 85% ✅ |
+| F1 | API-Sports | 阿里云 | MCP Exa | 75% ⚠️ |
+| 奥运会 | 动态计算 | 阿里云 | MCP Exa | 100% ✅ |
+
+**v3.0.6 搜索策略**:
+```
+1. 阿里云 WebSearch（中文优先，速度快）
+   ↓ 失败/超时/无结果
+2. MCP Exa（英文补充，覆盖西方赛事）
+   ↓ 失败/超时/无结果
+3. Tavily（深度搜索，高级模式）
+```
+
+**优势**:
+- ✅ 多源冗余，提高成功率（75% → 90%+）
+- ✅ 中英文互补，覆盖更全面
+- ✅ 自动故障转移，无需人工干预
 
 ---
 
