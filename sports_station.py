@@ -113,7 +113,7 @@ def aliyun_web_search(query: str, timeout: int = 10) -> str:
     return ""
 
 
-def dashscope_web_search(query: str, timeout: int = 10, count: int = 5) -> str:
+def dashscope_web_search(query: str, timeout: int = 10, count: int = 50) -> str:
     """使用 Dashscope MCP 服务器进行搜索 (AI 优化，无广告，结果精准)"""
     config_path = os.path.expanduser('~/.openclaw/workspace/config/mcporter.json')
     try:
