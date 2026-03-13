@@ -28,7 +28,7 @@
 
 ```
 sports-station/
-├── sports_monitor.py          # 主程序 (v4.0.3)
+├── sports_station.py          # 主程序 (v4.0.3)
 ├── interests.json             # 兴趣列表配置
 ├── interests.example.json     # 配置示例
 ├── discord_config.json        # Discord webhook 配置
@@ -466,11 +466,11 @@ def send_discord_message(message: str, webhook_url: str = None) -> bool:
 ### 基本命令
 
 ```bash
-# 查看今日赛事
-python3 sports_monitor.py --today
+# 查看指定日期赛事（必须使用明确日期）
+python3 sports_station.py --date 2026-03-13
 
 # 推送到 Discord
-python3 sports_monitor.py --today --push-discord
+python3 sports_station.py --date 2026-03-13 --push-discord
 ```
 
 ### 输出示例
@@ -534,7 +534,7 @@ python3 sports_monitor.py --today --push-discord
 **位置**: `sports-station/`
 
 **关键文件**:
-- `sports_monitor.py` - 主程序
+- `sports_station.py` - 主程序
 - `interests.json` - 兴趣列表
 - `discord_config.json` - Discord 配置
 - `DEVELOPMENT.md` - 开发文档（本文档）
@@ -546,11 +546,11 @@ python3 sports_monitor.py --today --push-discord
 
 **测试命令**:
 ```bash
-# 测试输出格式
-python3 sports_monitor.py --today
+# 测试输出格式（使用当前日期）
+python3 sports_station.py --date $(date +%Y-%m-%d)
 
 # 测试 Discord 推送
-python3 sports_monitor.py --today --push-discord
+python3 sports_station.py --date $(date +%Y-%m-%d) --push-discord
 ```
 
 ---
