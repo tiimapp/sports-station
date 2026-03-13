@@ -413,9 +413,14 @@ def fetch_football_fixtures(date: str, config: dict = None) -> dict:
     """
     # 构建严格的日期上下文
     date_context = format_search_date_context(date)
+    target_date = datetime.strptime(date, "%Y-%m-%d")
     
-    # 构建查询，明确指定日期和时区
-    query = f"{date_context} 足球赛程 五大联赛 中超 英超 西甲 意甲 德甲 法甲 对阵时间 UTC+8 北京时间"
+    # 构建更精确的搜索关键词（日期完全嵌入）
+    date_for_search = target_date.strftime('%Y年%m月%d日')
+    weekday_num = target_date.weekday()
+    weekdays = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
+    weekday_cn = weekdays[weekday_num]
+    query = f"{date_for_search} {weekday_cn} 足球赛程 中超 英超 西甲 意甲 德甲 法甲 对阵 {date} 比赛 UTC+8 北京时间"
     
     search_result = multi_source_search(query, timeout=15, config=config)
     
@@ -847,7 +852,8 @@ def main():
     Phase 7: Remove general date terms (--today removed)
     """
     parser = argparse.ArgumentParser(description='Sports Station v4.0.3 - 可配置搜索工具 + 严格时区控制')
-    parser.add_argument('--date', type=str, required=True, help='查看指定日期的比赛（格式：YYYY-MM-DD 或 YYYY/MM/DD，UTC+8）')
+    parser.add_argument('--date', type=str, default=None, help='查看指定日期的比赛（格式：YYYY-MM-DD 或 YYYY/MM/DD，UTC+8）')
+    parser.add_argument('--today', action='store_true', help='查看今天的比赛')
     parser.add_argument('--push-discord', action='store_true', help='将比赛摘要推送到 Discord')
     args = parser.parse_args()
     
@@ -855,11 +861,16 @@ def main():
     config = load_config()
     interests = load_interests()
     
-    # Phase 7: 使用显式日期（支持 YYYY-MM-DD 或 YYYY/MM/DD 格式）
-    date_str = args.date.replace('/', '-')
+    # Phase 7: 使用显式日期（支持 YYYY-MM-DD 或 YYYY/MM/DD 格式，也支持 --today）
+    if args.today:
+        date_str = get_beijing_date_str()
+    else:
+        date_str = args.date.replace('/', '-') if args.date else None
+    
     try:
         # 验证日期格式
-        datetime.strptime(date_str, '%Y-%m-%d')
+        if date_str:
+            datetime.strptime(date_str, '%Y-%m-%d')
         query_date = date_str
     except ValueError:
         print(f"❌ 错误：日期格式无效。请使用 YYYY-MM-DD 或 YYYY/MM/DD 格式（例如：2026-03-13 或 2026/03/13）")
