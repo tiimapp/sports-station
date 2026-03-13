@@ -409,19 +409,13 @@ def parse_football_fixtures(search_result: str, date: str) -> dict:
 def fetch_football_fixtures(date: str, config: dict = None) -> dict:
     """
     获取足球赛程
-    Phase 5.2.1: Enhanced with strict date context (UTC+8)
+    Phase 9.4: Updated to use structured query builder workflow
+    Step 3 & 4: Build structured query and execute search
     """
-    # 构建严格的日期上下文
-    date_context = format_search_date_context(date)
-    target_date = datetime.strptime(date, "%Y-%m-%d")
+    # Step 3: Build structured query with explicit date constraint
+    query = build_structured_query(date, '足球', language='zh')
     
-    # 构建更精确的搜索关键词（日期完全嵌入）
-    date_for_search = target_date.strftime('%Y年%m月%d日')
-    weekday_num = target_date.weekday()
-    weekdays = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
-    weekday_cn = weekdays[weekday_num]
-    query = f"{date_for_search} {weekday_cn} 足球赛程 中超 英超 西甲 意甲 德甲 法甲 对阵 {date} 比赛 UTC+8 北京时间"
-    
+    # Step 4: Execute search with config
     search_result = multi_source_search(query, timeout=15, config=config)
     
     if search_result:
@@ -521,6 +515,77 @@ def get_beijing_weekday() -> str:
     """获取北京时间星期几"""
     weekdays = ['星期一', '星期二', '星期三', '星期四', '星期五', '星期六', '星期日']
     return weekdays[get_beijing_datetime().weekday()]
+
+
+def parse_plain_language_date(date_input: str) -> str:
+    """
+    解析用户输入的日期（支持多种格式）
+    Step 1 & 2: Parse plain language and convert to exact date format
+    
+    Args:
+        date_input: 用户输入的日期（可以是 YYYY-MM-DD, YYYY/MM/DD, 或其他格式）
+    
+    Returns:
+        标准化的日期字符串 YYYY-MM-DD (UTC+8)
+    """
+    if not date_input:
+        return get_beijing_date_str()
+    
+    # 替换斜杠为连字符
+    date_input = date_input.replace('/', '-')
+    
+    try:
+        # 尝试解析标准格式 YYYY-MM-DD
+        parsed_date = datetime.strptime(date_input, '%Y-%m-%d')
+        return parsed_date.strftime('%Y-%m-%d')
+    except ValueError:
+        pass
+    
+    try:
+        # 尝试使用 dateutil 解析其他格式
+        parsed_date = date_parser.parse(date_input)
+        return parsed_date.strftime('%Y-%m-%d')
+    except:
+        pass
+    
+    # 如果解析失败，返回今天的日期
+    return get_beijing_date_str()
+
+
+def build_structured_query(date: str, sport_type: str, language: str = 'zh') -> str:
+    """
+    构建结构化搜索查询
+    Step 3: Build structured query with date constraints
+    
+    Args:
+        date: 日期字符串 YYYY-MM-DD
+        sport_type: 运动类型（如 'NBA', '英超', 'F1'）
+        language: 查询语言 ('zh' 中文, 'en' 英文)
+    
+    Returns:
+        结构化的搜索查询字符串
+    """
+    try:
+        target_date = datetime.strptime(date, '%Y-%m-%d')
+        
+        # 格式化日期为 YYYY/MM/DD
+        date_slash = target_date.strftime('%Y/%m/%d')
+        
+        # 中文日期和星期
+        cn_date = target_date.strftime('%Y年%m月%d日')
+        weekdays = ['星期一', '星期二', '星期三', '星期四', '星期五', '星期六', '星期日']
+        weekday = weekdays[target_date.weekday()]
+        
+        if language == 'zh':
+            # 中文查询格式
+            query = f"{date_slash} {sport_type} 赛程 result set must only include schedule as {date_slash} mentioned {cn_date}({weekday}) UTC+8 北京时间"
+        else:
+            # 英文查询格式
+            query = f"{date_slash} {sport_type} schedule result set must only include schedule as {date_slash} mentioned UTC+8 Beijing Time"
+        
+        return query
+    except:
+        return f"{date} {sport_type} schedule"
 
 
 def format_search_date_context(date_str: str) -> str:
@@ -709,17 +774,29 @@ def send_discord_message(message: str, webhook_url: str = None) -> bool:
         print(f"✗ 发送过程中出错: {e}")
         return False
 
-def format_nba_game(game: dict, favorite_teams: List[str]) -> str:
+def format_nba_game(game: dict, favorite_teams: List[str], query_date: str = None) -> str:
+    """
+    Phase 9.5: Updated to ensure exact date display
+    Step 5: Output with exact date
+    """
     home = game.get('home', '')
     away = game.get('away', '')
     time_str = game.get('time', '')
     
     try:
         dt = date_parser.parse(time_str)
-        date_str = dt.strftime('%m-%d')
+        date_str = dt.strftime('%m/%d')  # Use slash format as per SKILL.md
         time_only = dt.strftime('%H:%M')
     except:
-        date_str = datetime.now().strftime('%m-%d')
+        # Fallback: use query_date if provided
+        if query_date:
+            try:
+                dt = datetime.strptime(query_date, '%Y-%m-%d')
+                date_str = dt.strftime('%m/%d')
+            except:
+                date_str = datetime.now().strftime('%m/%d')
+        else:
+            date_str = datetime.now().strftime('%m/%d')
         time_only = time_str[:5] if time_str else 'TBD'
     
     is_fav = is_favorite_team(home, favorite_teams) or is_favorite_team(away, favorite_teams)
@@ -730,13 +807,26 @@ def format_nba_game(game: dict, favorite_teams: List[str]) -> str:
         return f"⭐⭐ {date_str} {time_only} | {away} @ {home} | 腾讯体育"
 
 
-def format_football_fixture(fixture: dict, favorite_teams: List[str]) -> str:
+def format_football_fixture(fixture: dict, favorite_teams: List[str], query_date: str = None) -> str:
+    """
+    Phase 9.5: Updated to ensure exact date display
+    Step 5: Output with exact date
+    """
     time = fixture.get('time', 'TBD')
     home = fixture.get('home', '')
     away = fixture.get('away', '')
     league = fixture.get('league', '足球')
     
-    date_str = datetime.now().strftime('%m-%d')
+    # Use query_date to ensure exact date display
+    if query_date:
+        try:
+            dt = datetime.strptime(query_date, '%Y-%m-%d')
+            date_str = dt.strftime('%m/%d')  # Use slash format as per SKILL.md
+        except:
+            date_str = datetime.now().strftime('%m/%d')
+    else:
+        date_str = datetime.now().strftime('%m/%d')
+    
     time_only = str(time)
     
     is_fav = is_favorite_team(home, favorite_teams) or is_favorite_team(away, favorite_teams)
@@ -787,7 +877,7 @@ def query_today_matches(interests: dict, config: dict = None, date: str = None) 
         if nba_games:
             lines.append("🏀 NBA")
             for game in nba_games:
-                lines.append(format_nba_game(game, favorite_teams))
+                lines.append(format_nba_game(game, favorite_teams, query_date))
             lines.append("")
     
     # ========== 足球 ==========
@@ -820,7 +910,7 @@ def query_today_matches(interests: dict, config: dict = None, date: str = None) 
             all_football.sort(key=lambda x: x.get('time', '99:99'))
             for fixture in all_football[:10]:
                 fav_teams = fixture.get('favorite_teams', [])
-                lines.append(format_football_fixture(fixture, fav_teams))
+                lines.append(format_football_fixture(fixture, fav_teams, query_date))
             lines.append("")
     
     # ========== F1 ==========
