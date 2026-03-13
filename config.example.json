@@ -1,22 +1,45 @@
 {
-  "api_key": "",
-  "favorite_teams": {
-    "nba": ["Golden State Warriors"],
-    "soccer": ["Real Madrid", "Barcelona", "Manchester City", "Liverpool"]
-  },
-  "leagues": {
-    "nba": "12",
-    "premier_league": 39,
-    "la_liga": 140,
-    "serie_a": 135,
-    "bundesliga": 78,
-    "ligue_1": 61,
-    "champions_league": 2
-  },
-  "language": "zh",
-  "notifications": {
+  "version": "4.0.3",
+  "search_tools": {
     "enabled": true,
-    "channel": "discord",
-    "remind_before_minutes": 60
+    "priority": [
+      "dashscope_mcp",
+      "aliyun",
+      "tavily"
+    ],
+    "tools": {
+      "dashscope_mcp": {
+        "enabled": true,
+        "timeout": 10,
+        "config_path": "~/.openclaw/workspace/config/mcporter.json",
+        "description": "AI 优化搜索，无广告，中文优先"
+      },
+      "aliyun": {
+        "enabled": true,
+        "timeout": 10,
+        "api_key": "YOUR_ALIYUN_API_KEY_HERE",
+        "model": "qwen-plus",
+        "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions",
+        "description": "阿里云 WebSearch，速度快"
+      },
+      "tavily": {
+        "enabled": true,
+        "timeout": 15,
+        "search_depth": "advanced",
+        "max_results": 5,
+        "description": "深度搜索，英文补充"
+      }
+    }
+  },
+  "comments": {
+    "priority": "搜索工具优先级顺序，按数组顺序依次尝试",
+    "enabled": "是否启用该搜索工具",
+    "timeout": "搜索超时时间（秒）",
+    "scenarios": {
+      "chinese_priority": "中文赛事优先: [\"dashscope_mcp\", \"aliyun\", \"tavily\"]",
+      "english_priority": "英文赛事优先: [\"tavily\", \"dashscope_mcp\", \"aliyun\"]",
+      "aliyun_only": "仅使用阿里云: [\"aliyun\"] + 禁用其他工具",
+      "fast_mode": "快速模式: 降低所有工具的 timeout 值"
+    }
   }
 }

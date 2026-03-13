@@ -29,6 +29,7 @@ except ImportError:
 # ============================================================================
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 INTERESTS_PATH = os.path.join(SCRIPT_DIR, 'interests.json')
+CONFIG_PATH = os.path.join(SCRIPT_DIR, 'config.json')
 
 # ============================================================================
 # 阿里云配置
@@ -156,18 +157,77 @@ def dashscope_web_search(query: str, timeout: int = 10, count: int = 5) -> str:
     return ""
 
 
-def multi_source_search(query: str, timeout: int = 15) -> str:
-    # 优先级: Dashscope → 阿里云 → Exa → Tavily
-    result = dashscope_web_search(query, timeout=min(timeout, 10))
-    if result and len(result) > 50:
-        return result
-    result = aliyun_web_search(query, timeout=min(timeout, 10))
-    if result and len(result) > 50:
-        return result
-    result = mcp_web_search(query, timeout=timeout)
-    if result and len(result) > 50:
-        return result
-    return tavily_web_search(query, timeout=timeout)
+def multi_source_search(query: str, timeout: int = 15, config: dict = None) -> str:
+    """
+    多源搜索策略（可配置优先级）
+    Phase 2: Refactored to support configurable search tools
+    
+    Args:
+        query: 搜索查询
+        timeout: 默认超时时间
+        config: 配置字典（从 load_config() 获取）
+    
+    Returns:
+        搜索结果文本
+    """
+    # 如果没有提供配置，使用默认配置
+    if not config:
+        config = load_config()
+    
+    # 获取搜索工具配置
+    search_tools_config = config.get('search_tools', {})
+    
+    # 检查搜索工具是否全局启用
+    if not search_tools_config.get('enabled', True):
+        return ""
+    
+    # 获取优先级列表和工具配置
+    priority = search_tools_config.get('priority', ['dashscope_mcp', 'aliyun', 'tavily'])
+    tools_config = search_tools_config.get('tools', {})
+    
+    # 按优先级顺序尝试搜索
+    for tool_name in priority:
+        # 获取工具配置
+        tool_cfg = tools_config.get(tool_name, {})
+        
+        # 检查工具是否启用 (Phase 2.3)
+        if not tool_cfg.get('enabled', True):
+            continue
+        
+        # 获取工具超时时间 (Phase 2.4)
+        tool_timeout = tool_cfg.get('timeout', timeout)
+        
+        # 调用对应的搜索函数 (Phase 2.2)
+        result = ""
+        try:
+            if tool_name == 'dashscope_mcp':
+                result = dashscope_web_search(query, timeout=tool_timeout)
+            elif tool_name == 'aliyun':
+                # 使用配置中的 API key（如果有）
+                api_key = tool_cfg.get('api_key', ALIYUN_CONFIG['api_key'])
+                if api_key != ALIYUN_CONFIG['api_key']:
+                    # 临时更新 ALIYUN_CONFIG
+                    old_key = ALIYUN_CONFIG['api_key']
+                    ALIYUN_CONFIG['api_key'] = api_key
+                    result = aliyun_web_search(query, timeout=tool_timeout)
+                    ALIYUN_CONFIG['api_key'] = old_key
+                else:
+                    result = aliyun_web_search(query, timeout=tool_timeout)
+            elif tool_name == 'tavily':
+                result = tavily_web_search(query, timeout=tool_timeout)
+            else:
+                # 未知工具，跳过
+                continue
+        except Exception as e:
+            # 搜索失败，尝试下一个工具
+            continue
+        
+        # 如果搜索成功，返回结果
+        if result and len(result) > 50:
+            return result
+    
+    # 所有工具都失败，返回空字符串
+    return ""
 
 
 # ============================================================================
@@ -346,9 +406,18 @@ def parse_football_fixtures(search_result: str, date: str) -> dict:
     return fixtures
 
 
-def fetch_football_fixtures(date: str) -> dict:
-    query = f"{date} 足球赛程 五大联赛 中超 英超 西甲 意甲 德甲 法甲 今日 对阵"
-    search_result = multi_source_search(query, timeout=15)
+def fetch_football_fixtures(date: str, config: dict = None) -> dict:
+    """
+    获取足球赛程
+    Phase 5.2.1: Enhanced with strict date context (UTC+8)
+    """
+    # 构建严格的日期上下文
+    date_context = format_search_date_context(date)
+    
+    # 构建查询，明确指定日期和时区
+    query = f"{date_context} 足球赛程 五大联赛 中超 英超 西甲 意甲 德甲 法甲 对阵时间 UTC+8 北京时间"
+    
+    search_result = multi_source_search(query, timeout=15, config=config)
     
     if search_result:
         return parse_football_fixtures(search_result, date)
@@ -359,6 +428,10 @@ def fetch_football_fixtures(date: str) -> dict:
 # NBA 赛程获取
 # ============================================================================
 def fetch_nba_schedule(date: str) -> List[dict]:
+    """
+    获取 NBA 赛程
+    Phase 5.2.2: Enhanced with strict UTC+8 timezone validation
+    """
     url = 'https://cdn.nba.com/static/json/staticData/scheduleLeagueV2_2.json'
     try:
         response = requests.get(url, timeout=10)
@@ -366,7 +439,13 @@ def fetch_nba_schedule(date: str) -> List[dict]:
         data = response.json()
         
         games = []
-        us_date = (datetime.strptime(date, '%Y-%m-%d') - timedelta(days=1)).strftime('%m/%d/%Y')
+        
+        # 解析目标日期（UTC+8）
+        target_date = datetime.strptime(date, '%Y-%m-%d')
+        target_date_str = target_date.strftime('%Y-%m-%d')
+        
+        # NBA API 使用美国日期（UTC-5 到 UTC-8），需要检查前一天
+        us_date = (target_date - timedelta(days=1)).strftime('%m/%d/%Y')
         
         for game_date in data.get('leagueSchedule', {}).get('gameDates', []):
             game_date_str = game_date.get('gameDate', '')
@@ -377,17 +456,24 @@ def fetch_nba_schedule(date: str) -> List[dict]:
                     
                     time_utc = game.get('gameDateTimeUTC', '')
                     try:
+                        # 转换为 UTC+8 北京时间
                         dt_utc = date_parser.parse(time_utc)
                         dt_beijing = dt_utc.replace(tzinfo=timezone.utc) + timedelta(hours=8)
                         time_beijing = dt_beijing.strftime('%Y-%m-%d %H:%M')
+                        
+                        # Phase 5.2.3: 严格过滤 - 只保留目标日期的比赛
+                        game_date_beijing = dt_beijing.strftime('%Y-%m-%d')
+                        if game_date_beijing != target_date_str:
+                            continue
+                        
+                        games.append({
+                            'home': home_team.get('teamName', ''),
+                            'away': away_team.get('teamName', ''),
+                            'time': time_beijing,
+                        })
                     except:
-                        time_beijing = time_utc[:16].replace('T', ' ') if time_utc else ''
-                    
-                    games.append({
-                        'home': home_team.get('teamName', ''),
-                        'away': away_team.get('teamName', ''),
-                        'time': time_beijing,
-                    })
+                        # 时间解析失败，跳过
+                        continue
         
         games.sort(key=lambda x: x['time'])
         return games
@@ -409,10 +495,54 @@ def fetch_f1_schedule() -> List[dict]:
 
 
 # ============================================================================
-# 辅助函数
+# 辅助函数 - 时区处理
 # ============================================================================
+def get_beijing_datetime() -> datetime:
+    """获取北京时间（UTC+8）"""
+    return datetime.now(timezone(timedelta(hours=8)))
+
+
 def get_beijing_date_str() -> str:
-    return datetime.now().strftime('%Y-%m-%d')
+    """获取北京日期字符串 YYYY-MM-DD"""
+    return get_beijing_datetime().strftime('%Y-%m-%d')
+
+
+def get_beijing_date_display() -> str:
+    """获取北京日期显示格式 YYYY年MM月DD日"""
+    return get_beijing_datetime().strftime('%Y年%m月%d日')
+
+
+def get_beijing_weekday() -> str:
+    """获取北京时间星期几"""
+    weekdays = ['星期一', '星期二', '星期三', '星期四', '星期五', '星期六', '星期日']
+    return weekdays[get_beijing_datetime().weekday()]
+
+
+def format_search_date_context(date_str: str) -> str:
+    """
+    格式化搜索日期上下文
+    为搜索工具提供明确的时间范围
+    
+    Args:
+        date_str: YYYY-MM-DD 格式的日期
+    
+    Returns:
+        包含日期上下文的字符串
+    """
+    try:
+        target_date = datetime.strptime(date_str, '%Y-%m-%d')
+        # 中文日期
+        cn_date = target_date.strftime('%Y年%m月%d日')
+        # 星期几
+        weekdays = ['星期一', '星期二', '星期三', '星期四', '星期五', '星期六', '星期日']
+        weekday = weekdays[target_date.weekday()]
+        
+        # 构建时间范围（当天 00:00 - 23:59 UTC+8）
+        date_context = f"{cn_date}({weekday}) 北京时间 今日赛程"
+        
+        return date_context
+    except:
+        return f"{date_str} 今日"
 
 
 def load_interests() -> dict:
@@ -429,6 +559,65 @@ def load_interests() -> dict:
             user_config = json.load(f)
             return {**default, **user_config}
     return default
+
+
+def load_config() -> dict:
+    """
+    加载配置文件 (config.json)
+    Phase 1.1: Configuration Loading
+    """
+    default_config = {
+        'version': '4.0.3',
+        'search_tools': {
+            'enabled': True,
+            'priority': ['dashscope_mcp', 'aliyun', 'tavily'],
+            'tools': {
+                'dashscope_mcp': {
+                    'enabled': True,
+                    'timeout': 10,
+                    'config_path': '~/.openclaw/workspace/config/mcporter.json'
+                },
+                'aliyun': {
+                    'enabled': True,
+                    'timeout': 10,
+                    'api_key': ALIYUN_CONFIG['api_key'],
+                    'model': ALIYUN_CONFIG['model'],
+                    'base_url': ALIYUN_CONFIG['base_url']
+                },
+                'tavily': {
+                    'enabled': True,
+                    'timeout': 15,
+                    'search_depth': 'advanced',
+                    'max_results': 5
+                }
+            }
+        }
+    }
+    
+    # 尝试加载用户配置
+    if os.path.exists(CONFIG_PATH):
+        try:
+            with open(CONFIG_PATH, 'r', encoding='utf-8') as f:
+                user_config = json.load(f)
+                # 合并配置（用户配置覆盖默认配置）
+                if 'search_tools' in user_config:
+                    # 合并 search_tools
+                    for key in user_config['search_tools']:
+                        if key == 'tools':
+                            # 合并每个工具的配置
+                            for tool_name, tool_cfg in user_config['search_tools']['tools'].items():
+                                if tool_name in default_config['search_tools']['tools']:
+                                    default_config['search_tools']['tools'][tool_name].update(tool_cfg)
+                                else:
+                                    default_config['search_tools']['tools'][tool_name] = tool_cfg
+                        else:
+                            default_config['search_tools'][key] = user_config['search_tools'][key]
+                return default_config
+        except Exception as e:
+            print(f"⚠️  配置文件加载失败，使用默认配置: {e}")
+            return default_config
+    
+    return default_config
 
 
 # ============================================================================
@@ -564,12 +753,23 @@ def format_f1_race(race: dict) -> str:
 # ============================================================================
 # 主查询函数
 # ============================================================================
-def query_today_matches(interests: dict) -> str:
-    today = get_beijing_date_str()
+def query_today_matches(interests: dict, config: dict = None, date: str = None) -> str:
+    """
+    查询指定日期的比赛
+    Phase 3.2: Updated to accept and pass config parameter
+    Phase 5.4.2: Updated to accept explicit date parameter
+    
+    Args:
+        interests: 兴趣配置
+        config: 搜索工具配置
+        date: 查询日期（YYYY-MM-DD 格式），如果为 None 则使用今天
+    """
+    # 使用指定日期或今天的日期（UTC+8）
+    query_date = date if date else get_beijing_date_str()
     sports = interests.get('sports', {})
     
     lines = []
-    lines.append(f"📅 {today} 赛事汇总")
+    lines.append(f"📅 {query_date} 赛事汇总")
     lines.append("=" * 60)
     lines.append("")
     
@@ -577,7 +777,7 @@ def query_today_matches(interests: dict) -> str:
     nba_config = sports.get('basketball', {}).get('leagues', {}).get('nba', {})
     if nba_config.get('enabled', False):
         favorite_teams = nba_config.get('teams', [])
-        nba_games = fetch_nba_schedule(today)
+        nba_games = fetch_nba_schedule(query_date)
         
         if nba_games:
             lines.append("🏀 NBA")
@@ -589,7 +789,7 @@ def query_today_matches(interests: dict) -> str:
     football_config = sports.get('football', {})
     if football_config.get('enabled', False):
         leagues_config = football_config.get('leagues', {})
-        football_data = fetch_football_fixtures(today)
+        football_data = fetch_football_fixtures(query_date, config=config)
         
         # 收集所有有效足球比赛
         all_football = []
@@ -640,20 +840,52 @@ def query_today_matches(interests: dict) -> str:
 # ============================================================================
 
 def main():
-    parser = argparse.ArgumentParser(description='Sports Station v4.0.3 - 固定格式赛事监控')
-    parser.add_argument('--today', action='store_true', help='查看今天的比赛')
+    """
+    主程序
+    Phase 3.1: Load config and pass to query functions
+    Phase 5.4: Add explicit date parameter support
+    """
+    parser = argparse.ArgumentParser(description='Sports Station v4.0.3 - 可配置搜索工具 + 严格时区控制')
+    parser.add_argument('--today', action='store_true', help='查看今天的比赛（UTC+8）')
+    parser.add_argument('--date', type=str, help='查看指定日期的比赛（格式：YYYY-MM-DD 或 YYYY/MM/DD，UTC+8）')
     parser.add_argument('--push-discord', action='store_true', help='将比赛摘要推送到 Discord')
     args = parser.parse_args()
     
+    # Phase 3.1: Load configuration
+    config = load_config()
     interests = load_interests()
     
-    if args.today:
-        result = query_today_matches(interests)
+    # Phase 5.4: 确定查询日期
+    query_date = None
+    if args.date:
+        # 使用指定日期（支持 YYYY-MM-DD 或 YYYY/MM/DD 格式）
+        date_str = args.date.replace('/', '-')
+        try:
+            # 验证日期格式
+            datetime.strptime(date_str, '%Y-%m-%d')
+            query_date = date_str
+        except ValueError:
+            print(f"❌ 错误：日期格式无效。请使用 YYYY-MM-DD 或 YYYY/MM/DD 格式（例如：2026-03-13 或 2026/03/13）")
+            return
+    elif args.today:
+        # 使用今天的日期（UTC+8）
+        query_date = get_beijing_date_str()
+    
+    if query_date:
+        # 显示查询的日期
+        date_display = format_search_date_context(query_date)
+        print(f"🔍 查询日期：{date_display}")
+        print()
+        
+        # Phase 5.4.4: Pass config and date to query function
+        result = query_today_matches(interests, config=config, date=query_date)
         print(result)
         
         # 如果指定了 --push-discord 参数，则推送消息
         if args.push_discord:
             send_discord_message(result)
+    else:
+        parser.print_help()
 
 
 if __name__ == '__main__':
