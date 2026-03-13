@@ -60,10 +60,10 @@ cp config.example.json config.json
 
 ```bash
 # 查看今天值得看的比赛
-python3 sports_monitor.py --today
+python3 sports_station.py --today
 
 # 推送到 Discord
-python3 sports_monitor.py --today --push-discord
+python3 sports_station.py --today --push-discord
 ```
 
 ---
@@ -73,7 +73,7 @@ python3 sports_monitor.py --today --push-discord
 ### 示例 1: 查询今日比赛
 
 ```bash
-$ python3 sports_monitor.py --today
+$ python3 sports_station.py --today
 
 📅 2026-03-13 赛事汇总
 ============================================================
@@ -95,7 +95,7 @@ $ python3 sports_monitor.py --today
 ### 示例 2: Discord 推送
 
 ```bash
-$ python3 sports_monitor.py --today --push-discord
+$ python3 sports_station.py --today --push-discord
 
 ✓ 成功发送到 Discord
 ```
@@ -233,7 +233,7 @@ $ python3 sports_monitor.py --today --push-discord
 import subprocess
 
 result = subprocess.run(
-    ['python3', 'sports-station/sports_monitor.py', '--today'],
+    ['python3', 'sports-station/sports_station.py', '--today'],
     capture_output=True,
     text=True
 )
@@ -244,10 +244,10 @@ print(result.stdout)
 
 ```bash
 # 每天早上 9 点推送今日比赛
-0 9 * * * cd /path/to/sports-station && python3 sports_monitor.py --today --push-discord
+0 9 * * * cd /path/to/sports-station && python3 sports_station.py --today --push-discord
 
 # 每小时检查更新
-0 * * * * cd /path/to/sports-station && python3 sports_monitor.py --today > /tmp/sports.log
+0 * * * * cd /path/to/sports-station && python3 sports_station.py --today > /tmp/sports.log
 ```
 
 ### Discord 机器人集成
@@ -326,7 +326,7 @@ export DISCORD_GAMEDAY_WEBHOOK="https://discord.com/api/webhooks/YOUR_WEBHOOK_UR
 **位置**: `sports-station/`
 
 **关键文件**:
-- `sports_monitor.py` - 主程序
+- `sports_station.py` - 主程序
 - `interests.json` - 兴趣列表
 - `discord_config.json` - Discord 配置
 
