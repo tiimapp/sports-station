@@ -29,15 +29,12 @@
 ### 基本命令
 
 ```bash
-# 查看今天值得看的比赛（基于 UTC+8 当前日期）
-python3 sports_monitor.py --today
-
-# 查看指定日期的比赛（推荐用法 - 明确日期）
-python3 sports_monitor.py --date 2026-03-13
-python3 sports_monitor.py --date 2026/03/13  # 也支持斜杠格式
+# 查看指定日期的比赛（必须使用明确日期，UTC+8）
+python3 sports_station.py --date 2026-03-13
+python3 sports_station.py --date 2026/03/13  # 也支持斜杠格式
 
 # 推送到 Discord
-python3 sports_monitor.py --date 2026-03-13 --push-discord
+python3 sports_station.py --date 2026-03-13 --push-discord
 ```
 
 ### ⚠️ 时区处理说明（Agent 调用必读）
@@ -65,11 +62,16 @@ python3 sports_monitor.py --date 2026-03-13 --push-discord
 #### Agent 调用建议
 
 ```python
-# ✅ 正确：直接调用，系统自动使用 UTC+8 当前日期
-result = subprocess.run(['python3', 'sports_monitor.py', '--today'], ...)
+# ✅ 正确：使用明确的日期格式（YYYY-MM-DD）
+from datetime import datetime, timezone, timedelta
 
-# ⚠️ 注意：不要尝试传递其他时区的日期
-# 系统内部已处理所有时区转换
+# 获取 UTC+8 当前日期
+beijing_tz = timezone(timedelta(hours=8))
+today = datetime.now(beijing_tz).strftime('%Y-%m-%d')
+
+result = subprocess.run(['python3', 'sports_station.py', '--date', today], ...)
+
+# ⚠️ 注意：必须传递明确的日期，不接受 "today" 等模糊术语
 ```
 
 #### 时区处理保证
@@ -192,9 +194,14 @@ pip install requests python-dateutil tavily-python
 
 ```python
 import subprocess
+from datetime import datetime, timezone, timedelta
+
+# 获取 UTC+8 当前日期
+beijing_tz = timezone(timedelta(hours=8))
+today = datetime.now(beijing_tz).strftime('%Y-%m-%d')
 
 result = subprocess.run(
-    ['python3', 'sports_monitor.py', '--today'],
+    ['python3', 'sports_station.py', '--date', today],
     capture_output=True,
     text=True
 )
@@ -204,8 +211,8 @@ print(result.stdout)
 ### Cron 定时任务
 
 ```bash
-# 每天早上 9 点推送
-0 9 * * * cd /path/to/sports-station && python3 sports_monitor.py --today --push-discord
+# 每天早上 9 点推送（使用 date 命令获取当前日期）
+0 9 * * * cd /path/to/sports-station && python3 sports_station.py --date $(date +\%Y-\%m-\%d) --push-discord
 ```
 
 ## 版本信息
